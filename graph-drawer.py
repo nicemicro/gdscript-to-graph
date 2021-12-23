@@ -8,6 +8,7 @@ Created on Thu Dec 23 15:11:13 2021
 
 import os
 import enum
+import sys, getopt
 
 class place(enum.Enum):
     universal = enum.auto()
@@ -22,7 +23,7 @@ def find_files(path):
                 filelist.append({"dir": dirpath, "file": filename})
     return filelist
 
-def process_file(path):
+def process_file(path, marker, show_all):
     functions = {}
     current_type = place.universal
     current_func = ""
@@ -41,7 +42,10 @@ def process_file(path):
         line = line.strip()
         if len(fline.split("#")) > 1:
             commentline = fline.split("#")[1]
-            if commentline and commentline[0] != " " and commentline[0] != "\t":
+            accepted_comm = (not commentline or
+                commentline[0:len(marker)] == marker or
+                commentline[0:len(marker)] == marker.replace(" ", "\t"))
+            if not accepted_comm:
                 commentline = ""
         else:
             commentline = ""
@@ -86,15 +90,18 @@ def process_file(path):
             ignoreitem = (line[0:5] == "print" or line[0:6] == "assert")
             if controlitem:
                 if comment == "":
-                    func_ctrl[-1].append([line])
+                    if show_all:
+                        func_ctrl[-1].append([line])
+                    else:
+                        func_ctrl[-1].append([""])
                 else:
                     func_ctrl[-1].append([comment[1:]])
                 func_ctrl.append(func_ctrl[-1][-1])
                 comment = ""
             elif not ignoreitem:
-                if comment == "":
+                if comment == "" and show_all:
                     func_ctrl[-1].append(line)
-                else:    
+                elif comment != "":
                     func_ctrl[-1].append(comment[1:])
                 comment = ""
             else:
@@ -102,11 +109,12 @@ def process_file(path):
         prev_tabs = tabs
     return functions
 
-def read_all(path):
+def read_all(path, marker, show_all):
     filelist = find_files(path)
     files = {}
     for filename in filelist:
-        file = process_file(os.path.join(filename["dir"], filename["file"]))
+        file = process_file(os.path.join(filename["dir"], filename["file"]),
+                            marker, show_all)
         files[filename["file"]] = file
     return files
 
@@ -165,6 +173,23 @@ def make_graph(files):
     sc_subgraph(files, "Server", place.server)
     sc_subgraph(files, "Client 2", place.client)
     print("}")
+
+def main(cmdargs):
+    show_all = False
+    marker = " "
+    
+    opts, args = getopt.gnu_getopt(cmdargs,"m:a",["marker=", "all"])
+    for opt, arg in opts:
+        if opt == "-m" or opt == "--marker":
+            marker = arg
+        elif opt == "-a":
+            show_all = True
+        else:
+            assert False, "unhandled commandline option"
+    if len(args) == 1:
+        make_graph(read_all(args[0], marker, show_all))
+    
 #%%
-make_graph(read_all("/home/nicemicro/bin/opensus/src/"))
+if __name__ == "__main__":
+   main(sys.argv[1:])
 #a = process_file("/home/nicemicro/bin/opensus/src/autoloads/resources.gd")

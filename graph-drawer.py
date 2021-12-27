@@ -41,12 +41,14 @@ def process_file(path, marker, show_all):
         line = fline.split("#")[0]
         line = line.strip()
         if len(fline.split("#")) > 1:
-            commentline = fline.split("#")[1]
-            accepted_comm = (not commentline or
+            commentline = fline[fline.find("#") + 1:]
+            accepted_comm = fline.find("#") != -1 and (not commentline or
                 commentline[0:len(marker)] == marker or
                 commentline[0:len(marker)] == marker.replace(" ", "\t"))
             if not accepted_comm:
                 commentline = ""
+            else:
+                commentline = commentline[len(marker):]
         else:
             commentline = ""
         commentline = commentline.strip()
@@ -178,12 +180,16 @@ def main(cmdargs):
     show_all = False
     marker = " "
     
-    opts, args = getopt.gnu_getopt(cmdargs,"m:a",["marker=", "all"])
+    opts, args = getopt.gnu_getopt(cmdargs,"m:ah",["marker=", "all"])
     for opt, arg in opts:
         if opt == "-m" or opt == "--marker":
             marker = arg
-        elif opt == "-a":
+        elif opt == "-a" or opt == "--all":
             show_all = True
+        elif opt == "-h":
+            print("-m --marker: characters that should mark meaningful commets")
+            print("-a --all:    all releavant lines should be represented")
+            print("Give the directory name to crawl.")
         else:
             assert False, "unhandled commandline option"
     if len(args) == 1:
@@ -192,4 +198,4 @@ def main(cmdargs):
 #%%
 if __name__ == "__main__":
    main(sys.argv[1:])
-#a = process_file("/home/nicemicro/bin/opensus/src/autoloads/resources.gd")
+   #a = process_file("/home/nicemicro/bin/opensus/src/game/character/character.gd", "# ", False)

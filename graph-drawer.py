@@ -122,13 +122,15 @@ def read_all(path, marker, show_all):
 
 def control_extract(operations, string, counter):
     for num, op in enumerate(operations):
-        if num > 0:
-            string = string  + " | "
-        if isinstance(op, list):
+        if isinstance(op, list) and op[0] != "":
+            if num > 0:
+                string = string  + " | "
             string = string + "{"
             string, counter = control_extract(op, string, counter)
             string = string + "}"
-        else:
+        elif isinstance(op, str):
+            if num > 0:
+                string = string  + " | "
             op = op.replace("\"", "\\\"")
             op = op.replace("'", "\\'")
             op = op.replace("{", "\\{")
@@ -144,7 +146,10 @@ def function_unit(function, fullname, functname):
     record = ""
     record, cnt = control_extract(function, record, 0)
     print(f"            {fullname} [")
-    print(f"                label=\"<begin>{functname} | {record}\"")
+    if record.strip():
+        print(f"                label=\"<begin>{functname} | {record}\"")
+    else:
+        print(f"                label=\"<begin>{functname}\"")
     print("                shape=\"record\"")
     print("            ]")
 

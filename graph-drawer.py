@@ -121,13 +121,15 @@ def read_all(path, marker, show_all):
     return files
 
 def control_extract(operations, string, counter):
-    for num, op in enumerate(operations):
+    num = 0
+    for op in operations:
         if isinstance(op, list) and op[0] != "":
             if num > 0:
                 string = string  + " | "
             string = string + "{"
             string, counter = control_extract(op, string, counter)
             string = string + "}"
+            num += 1
         elif isinstance(op, str):
             if num > 0:
                 string = string  + " | "
@@ -140,65 +142,119 @@ def control_extract(operations, string, counter):
             op = op.replace("\n", "\\n")
             string = string + f"<f{counter}> {op} "
             counter += 1
+            num += 1
     return string, counter
 
 def function_unit(function, fullname, functname):
     record = ""
     record, cnt = control_extract(function, record, 0)
-    print(f"            {fullname} [")
+    function_text = f"            {fullname} [\n"
     if record.strip():
-        print(f"                label=\"<begin>{functname} | {record}\"")
+        function_text += \
+            f"                label=\"<begin>{functname} | {record}\"\n"
     else:
-        print(f"                label=\"<begin>{functname}\"")
-    print("                shape=\"record\"")
-    print("            ]")
+        function_text += \
+            f"                label=\"<begin>{functname}\"\n"
+    function_text += "                shape=\"record\"\n"
+    function_text += "            ]\n"
+    return function_text
 
-def file_subgraph(file, fname, servcl, serverclient):
+def file_subgraph(file, fname, servcl, serverclient, nodes):
     fname_cut = fname.split(".")[0]
-    print(f"        subgraph cluster_{servcl}_{fname_cut} " + "{")
-    print(f"            label=\"{fname}\"; labeljust=\"l\";")
+    cluster_name = f"cluster_{servcl}_{fname_cut}"
+    function_units = ""
     for function in file:
         functype = file[function]["type"]
-        if functype == serverclient or functype == place.universal:
-            function_unit(file[function]["ctrl"],
-                          f"{servcl}_{fname_cut}_{function}",
-                          function)
-    print("        }")
+        fullname = f"{servcl}_{fname_cut}_{function}"
+        show_func = ((functype == serverclient or functype == place.universal)
+                     and (len(nodes)==0 or fullname in nodes))
+        if show_func:
+            function_units += \
+                function_unit(file[function]["ctrl"], fullname, function)
+    if not function_units and cluster_name not in nodes:
+        return ""
+    subgraph_text =  f"        subgraph {cluster_name} " + "{\n"
+    subgraph_text += f"            label=\"{fname}\"; labeljust=\"l\";\n"
+    subgraph_text += function_units
+    subgraph_text +=  "        }\n"
+    return(subgraph_text)
 
-def sc_subgraph(files, servcl, serverclient):
+def sc_subgraph(files, servcl, serverclient, nodes):
     subg_name = servcl.lower().replace(" ", "")
+    file_subgraphs = ""
+    for filen in files:
+        file_subgraphs += \
+            file_subgraph(files[filen], filen, subg_name, serverclient, nodes)
     print(f"    subgraph cluster_{subg_name} " + "{")
     print(f"        label=\"{servcl}\"; labeljust=\"l\";")
-    for filen in files:
-        file_subgraph(files[filen], filen, subg_name, serverclient)
+    print(file_subgraphs)
     print("    }")
 
-def make_graph(files):
+def make_graph(files, edges):
     print("digraph controlflow {")
     print("    rankdir=\"LR\";")
-    sc_subgraph(files, "Client 1", place.client)
-    sc_subgraph(files, "Server", place.server)
-    sc_subgraph(files, "Client 2", place.client)
+    sc_subgraph(files, "Client 1", place.client, edges["nodelist"])
+    sc_subgraph(files, "Server", place.server, edges["nodelist"])
+    sc_subgraph(files, "Client 2", place.client, edges["nodelist"])
+    print(edges["text"])
     print("}")
+    
+def parse_edges(stdin, path=""):
+    nodelist = []
+    text = ""
+    
+    if stdin:
+        lines = sys.stdin.readlines()
+    else:
+        with open(path) as gdfile:
+            lines = gdfile.readlines()
+    for fline in lines:
+        text = text + "\n    " + fline[:-1]
+        line = fline.strip()
+        sep = line.find("->")
+        if sep == -1:
+            continue
+        left = line[0:sep].strip()
+        left = left.split(":")[0]
+        if not left in nodelist:
+            nodelist.append(left)
+        right = line[sep + 2:].strip()
+        right = right.split("[")[0]
+        right = right.split(":")[0].strip()
+        if not right in nodelist:
+            nodelist.append(right)
+    return {"text": text, "nodelist": nodelist}
 
 def main(cmdargs):
     show_all = False
     marker = " "
+    edges = {"text": "", "nodelist": []}
     
-    opts, args = getopt.gnu_getopt(cmdargs,"m:ah",["marker=", "all"])
+    opts, args = getopt.gnu_getopt(cmdargs,"m:ahsf:",
+                                   ["marker=", "all", "help", "stdin", "file"])
     for opt, arg in opts:
         if opt == "-m" or opt == "--marker":
             marker = arg
         elif opt == "-a" or opt == "--all":
             show_all = True
-        elif opt == "-h":
+        elif opt == "-s" or opt == "--stdin":
+            newedges = parse_edges(True)
+            edges["text"] = edges["text"] + newedges["text"]
+            edges["nodelist"] = edges["nodelist"] + newedges["nodelist"]
+        elif opt == "-f" or opt == "--file":
+            newedges = parse_edges(False, arg)
+            edges["text"] = edges["text"] + newedges["text"]
+            edges["nodelist"] = edges["nodelist"] + newedges["nodelist"]
+        elif opt == "-h" or opt == "--help":
             print("-m --marker: characters that should mark meaningful commets")
             print("-a --all:    all releavant lines should be represented")
-            print("Give the directory name to crawl.")
+            print("-s --stdin:  read the graph edges from standard input")
+            print("-f --file:   read the graph edges from a file")
+            print("Give the directory name to crawl as a cmdline argument.")
         else:
             assert False, "unhandled commandline option"
     if len(args) == 1:
-        make_graph(read_all(args[0], marker, show_all))
+        make_graph(read_all(args[0], marker, show_all), edges)
     
 #%%
 if __name__ == "__main__":

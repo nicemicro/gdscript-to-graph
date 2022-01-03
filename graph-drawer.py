@@ -63,8 +63,10 @@ def process_file(path, marker, show_all):
             continue
         
         # checks whether this line is the start of a new function
-        functionstart = (line[0:4] == "func" or line[0:11] == "puppet func" or
+        functionstart = (line[0:4] == "func" or line[0:11] == "remote func" or
+                         line[0:11] == "puppet func" or
                          line[0:11] == "master func" or
+                         line[0:15] == "remotesync func" or
                          line[0:15] == "mastersync func" or
                          line[0:15] == "puppetsync func")
         if functionstart:

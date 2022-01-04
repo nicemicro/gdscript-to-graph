@@ -122,19 +122,23 @@ def read_all(path, marker, show_all):
         files[filename["file"]] = file
     return files
 
-def control_extract(operations, string, counter):
+def control_extract(operations, string, counter, depth=0):
     num = 0
     for op in operations:
         if isinstance(op, list) and op[0] != "":
             if num > 0:
-                string = string  + " | "
+                string += " | "
+            if num == 1 and depth > 0:
+                string += " { "
             string = string + "{"
-            string, counter = control_extract(op, string, counter)
+            string, counter = control_extract(op, string, counter, depth+1)
             string = string + "}"
             num += 1
         elif isinstance(op, str):
             if num > 0:
-                string = string  + " | "
+                string += " | "
+            if num == 1 and depth > 0:
+                string += " { "
             op = op.replace("\"", "\\\"")
             op = op.replace("'", "\\'")
             op = op.replace("{", "\\{")
@@ -142,9 +146,11 @@ def control_extract(operations, string, counter):
             op = op.replace("<", "\\<")
             op = op.replace(">", "\\>")
             op = op.replace("\n", "\\n")
-            string = string + f"<f{counter}> {op} "
+            string += f"<f{counter}> {op} "
             counter += 1
             num += 1
+    if depth > 0 and num > 1:
+        string += " } "
     return string, counter
 
 def function_unit(function, fullname, functname):

@@ -17,7 +17,7 @@ class place(enum.Enum):
 
 def find_files(path):
     filelist = []
-    for dirpath, dirs, files in os.walk(path):  
+    for dirpath, dirs, files in os.walk(path):
         for filename in files:
             if filename[-3:] == ".gd":
                 filelist.append({"dir": dirpath, "file": filename})
@@ -31,10 +31,10 @@ def process_file(path, marker, show_all):
     tabs = 0
     prev_tabs = 0
     comment = ""
-    
+
     # This variable keeps track of the current nesting level
     func_ctrl = []
-    
+
     with open(path) as gdfile:
         lines = gdfile.readlines()
     for fline in lines:
@@ -61,7 +61,7 @@ def process_file(path, marker, show_all):
             elif "Client" in commentline or "client" in commentline:
                 current_type = place.client
             continue
-        
+
         # checks whether this line is the start of a new function
         functionstart = (line[0:4] == "func" or line[0:11] == "remote func" or
                          line[0:11] == "puppet func" or
@@ -76,20 +76,21 @@ def process_file(path, marker, show_all):
             functions[current_func] = {"type": current_type, "ctrl": []}
             func_ctrl = [functions[current_func]["ctrl"]]
             ftabs = tabs
+            prev_tabs = tabs
             comment = ""
             continue
-        
+        if len(commentline) > 0:
+            comment = comment + "\n" + commentline
+        # If this line does not contain a command, we move to the next line
+        if line == "":
+            continue
         # if the current tab depth is lower than the previous, we pop
         if tabs < prev_tabs and len(func_ctrl) > 0:
             for i in range(prev_tabs-tabs):
                 func_ctrl.pop()
-        
-        if len(commentline) > 0:
-            comment = comment + "\n" + commentline
-        
         # ignore empty lines and ones that are not tabulated deeper than the
         # last function declaration
-        if current_func != "" and line != "" and tabs > ftabs:
+        if current_func != "" and tabs > ftabs:
             controlitem = (line[-1] == ":")
             ignoreitem = (line[0:5] == "print" or line[0:6] == "assert")
             if controlitem:
@@ -206,11 +207,11 @@ def make_graph(files, edges):
     sc_subgraph(files, "Client 2", place.client, edges["nodelist"])
     print(edges["text"])
     print("}")
-    
+
 def parse_edges(stdin, path=""):
     nodelist = []
     text = ""
-    
+
     if stdin:
         lines = sys.stdin.readlines()
     else:
@@ -237,7 +238,7 @@ def main(cmdargs):
     show_all = False
     marker = " "
     edges = {"text": "", "nodelist": []}
-    
+
     opts, args = getopt.gnu_getopt(cmdargs,"m:ahsf:",
                                    ["marker=", "all", "help", "stdin", "file"])
     for opt, arg in opts:
@@ -263,8 +264,8 @@ def main(cmdargs):
             assert False, "unhandled commandline option"
     if len(args) == 1:
         make_graph(read_all(args[0], marker, show_all), edges)
-    
+
 #%%
 if __name__ == "__main__":
    main(sys.argv[1:])
-   #a = process_file("/home/nicemicro/bin/opensus/src/game/character/character.gd", "# ", False)
+   #a = process_file("/home/nicemicro/bin/opensus/src/autoloads/characters.gd", "# ", False)

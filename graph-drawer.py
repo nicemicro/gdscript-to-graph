@@ -173,10 +173,13 @@ def file_subgraph(file, fname, servcl, serverclient, nodes):
     cluster_name = f"cluster_{servcl}_{fname_cut}"
     function_units = ""
     for function in file:
-        functype = file[function]["type"]
+        #functype = file[function]["type"]
         fullname = f"{servcl}_{fname_cut}_{function}"
-        show_func = ((functype == serverclient or functype == place.universal)
-                     and (len(nodes)==0 or fullname in nodes))
+        #show_func = ((functype == serverclient or functype == place.universal)
+        #             and (len(nodes)==0 or fullname in nodes))
+        # At this point we don't need to care whether a function is server or
+        # client function anymore
+        show_func = (len(nodes)==0 or fullname in nodes)
         if show_func:
             function_units += \
                 function_unit(file[function]["ctrl"], fullname, function)
